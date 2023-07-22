@@ -5,6 +5,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.noman.humandetection.databinding.ActivityMainBinding
+import com.noman.humandetection.face_detection.FaceDetectionActivity
+import com.noman.humandetection.qr_scanner.ScannerActivity
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,6 +26,9 @@ class MainActivity : AppCompatActivity() {
         binding.btnOpenScanner.setOnClickListener{
             requestCameraAndStartScanner()
         }
+        binding.btnFaceDetection.setOnClickListener{
+            FaceDetectionActivity.start(this)
+        }
     }
 
     private fun requestCameraAndStartScanner(){
@@ -35,17 +40,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startScanner(){
-        ScannerActivity.startScanner(this){ barcodes ->
-            barcodes.forEach{barcode ->
-                when(barcode.valueType){
-                    Barcode.TYPE_URL ->{
-                        binding.txtQrCodeInfo.text = barcode.url.toString()
-                    }else ->{
-                        binding.txtQrCodeInfo.text = barcode.rawValue.toString()
-                    }
-                }
-            }
-        }
+        ScannerActivity.startScanner(this)
     }
 
     private fun requestCameraPermission() {

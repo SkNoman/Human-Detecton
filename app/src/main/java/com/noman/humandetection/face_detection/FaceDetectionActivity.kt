@@ -1,30 +1,36 @@
-package com.noman.humandetection
+package com.noman.humandetection.face_detection
 
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.content.ContextCompat
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import com.noman.humandetection.databinding.ActivityScannerBinding
-import java.util.concurrent.Executor
+import com.google.mlkit.vision.face.Face
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetector
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.noman.humandetection.CameraXViewModel
+import com.noman.humandetection.R
+import com.noman.humandetection.databinding.ActivityFaceDetectionBinding
+import com.noman.humandetection.qr_scanner.ScannerActivity
 import java.util.concurrent.Executors
 
-class ScannerActivity : AppCompatActivity() {
-
-    private lateinit var binding: ActivityScannerBinding
+class FaceDetectionActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityFaceDetectionBinding
 
     private lateinit var cameraSelector: CameraSelector
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
@@ -32,52 +38,56 @@ class ScannerActivity : AppCompatActivity() {
     private lateinit var cameraPreview: Preview
     private lateinit var imageAnalysis: ImageAnalysis
 
+    private val cameraXViewModel = viewModels<CameraXViewModel>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityScannerBinding.inflate(layoutInflater)
+
+        binding = ActivityFaceDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+        cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_FRONT).build()
         cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
-        cameraProviderFuture.addListener({
-            processCameraProvider = cameraProviderFuture.get()
+        cameraXViewModel.value.processCameraProvider.observe(this){ provider ->
+            processCameraProvider = provider
             bindCameraPreview()
             bindInputAnalyser()
-        }, ContextCompat.getMainExecutor(this))
-
+        }
     }
 
     private fun bindInputAnalyser() {
-        val barcodeScanner:BarcodeScanner = BarcodeScanning.getClient(
-           BarcodeScannerOptions.Builder()
-               .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
-               .build()
+
+        val detector = FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
+                .build()
         )
         imageAnalysis = ImageAnalysis.Builder()
-            .setTargetRotation(binding.previewView.display.rotation)
+            .setTargetRotation(binding.faceDetectionPreview.display.rotation)
             .build()
 
         val cameraExecutor = Executors.newSingleThreadExecutor()
 
         imageAnalysis.setAnalyzer(cameraExecutor){ imageProxy ->
-            processImageProxy(barcodeScanner,imageProxy)
+            processImageProxy(detector,imageProxy)
         }
 
         processCameraProvider.bindToLifecycle(this, cameraSelector , imageAnalysis)
     }
 
     @SuppressLint("UnsafeOptInUsageError")
-    private fun processImageProxy(barcodeScanner: BarcodeScanner, imageProxy: ImageProxy)
+    private fun processImageProxy(detector: FaceDetector, imageProxy: ImageProxy)
     {
         val inputImage = InputImage.fromMediaImage(imageProxy.image!!, imageProxy.imageInfo.rotationDegrees)
 
-        barcodeScanner.process(inputImage)
-            .addOnSuccessListener { barcodes ->
-                if (barcodes.isNotEmpty()){
-                    onScan?.invoke(barcodes)
-                    onScan = null
-                    finish()
+        detector.process(inputImage)
+            .addOnSuccessListener { faces ->
+                binding.faceBoxOverlay.clear()
+                faces.forEach{face ->
+                    val box = FaceBox(binding.faceBoxOverlay,face,imageProxy.cropRect)
+                    binding.faceBoxOverlay.add(box)
                 }
             }.addOnFailureListener{
                 it.printStackTrace()
@@ -87,21 +97,21 @@ class ScannerActivity : AppCompatActivity() {
             }
     }
 
+
     private fun bindCameraPreview(){
         cameraPreview = Preview.Builder()
-            .setTargetRotation(binding.previewView.display.rotation)
+            .setTargetRotation(binding.faceDetectionPreview.display.rotation)
             .build()
-        cameraPreview.setSurfaceProvider(binding.previewView.surfaceProvider)
+        cameraPreview.setSurfaceProvider(binding.faceDetectionPreview.surfaceProvider)
         processCameraProvider.bindToLifecycle(this, cameraSelector , cameraPreview)
     }
+
     companion object{
-        private var onScan: ((barcodes: List<Barcode>) ->Unit)? = null
-        fun startScanner(context: Context, onScan: (barcodes: List<Barcode>) -> Unit){
-            this.onScan = onScan
-            Intent(context, ScannerActivity::class.java).also {
+      //  private var TAG = FaceDetectionActivity::class.simpleName
+        fun start(context: Context){
+            Intent(context, FaceDetectionActivity::class.java).also {
                 context.startActivity(it)
             }
         }
     }
-
 }

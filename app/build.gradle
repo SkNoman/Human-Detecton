@@ -44,6 +44,10 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    implementation "androidx.activity:activity-ktx:1.7.2"
+
+    //guava
+    implementation "com.google.guava:guava:27.1-android"
 
     //camera x
     implementation "androidx.camera:camera-camera2:1.2.3"
@@ -52,4 +56,7 @@ dependencies {
 
     //barcode
     implementation "com.google.mlkit:barcode-scanning:17.1.0"
+
+    //face detection
+    implementation "com.google.android.gms:play-services-mlkit-face-detection:17.1.0"
 }
