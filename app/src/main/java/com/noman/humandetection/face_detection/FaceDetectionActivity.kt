@@ -40,14 +40,30 @@ class FaceDetectionActivity : AppCompatActivity() {
 
     private val cameraXViewModel = viewModels<CameraXViewModel>()
 
+    private var lensFacing = CameraSelector.LENS_FACING_FRONT
+
+    private val detector by lazy {
+        FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
+                .build()
+        )
+    }
+    private val cameraExecutor = Executors.newSingleThreadExecutor()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityFaceDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_FRONT).build()
+        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
         cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        binding.btnSwitchCamera.setOnClickListener {
+            switchCamera()
+        }
 
         cameraXViewModel.value.processCameraProvider.observe(this){ provider ->
             processCameraProvider = provider
@@ -56,19 +72,23 @@ class FaceDetectionActivity : AppCompatActivity() {
         }
     }
 
-    private fun bindInputAnalyser() {
+    private fun switchCamera() {
+        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT)
+            CameraSelector.LENS_FACING_BACK
+        else
+            CameraSelector.LENS_FACING_FRONT
 
-        val detector = FaceDetection.getClient(
-            FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
-                .build()
-        )
+        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        binding.faceBoxOverlay.clear()
+        processCameraProvider.unbindAll()
+        bindCameraPreview()
+        bindInputAnalyser()
+    }
+
+    private fun bindInputAnalyser() {
         imageAnalysis = ImageAnalysis.Builder()
             .setTargetRotation(binding.faceDetectionPreview.display.rotation)
             .build()
-
-        val cameraExecutor = Executors.newSingleThreadExecutor()
 
         imageAnalysis.setAnalyzer(cameraExecutor){ imageProxy ->
             processImageProxy(detector,imageProxy)

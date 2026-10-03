@@ -35,13 +35,28 @@ class ScannerActivity : AppCompatActivity() {
 
     private val cameraXViewModel = viewModels<CameraXViewModel>()
 
+    private var lensFacing = CameraSelector.LENS_FACING_BACK
+
+    private val barcodeScanner: BarcodeScanner by lazy {
+        BarcodeScanning.getClient(
+            BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
+                .build()
+        )
+    }
+    private val cameraExecutor = Executors.newSingleThreadExecutor()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityScannerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
         cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        binding.btnSwitchCamera.setOnClickListener {
+            switchCamera()
+        }
 
        cameraXViewModel.value.processCameraProvider.observe(this){ provider ->
            processCameraProvider = provider
@@ -50,17 +65,22 @@ class ScannerActivity : AppCompatActivity() {
        }
     }
 
+    private fun switchCamera() {
+        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK)
+            CameraSelector.LENS_FACING_FRONT
+        else
+            CameraSelector.LENS_FACING_BACK
+
+        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        processCameraProvider.unbindAll()
+        bindCameraPreview()
+        bindInputAnalyser()
+    }
+
     private fun bindInputAnalyser() {
-        val barcodeScanner:BarcodeScanner = BarcodeScanning.getClient(
-           BarcodeScannerOptions.Builder()
-               .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
-               .build()
-        )
         imageAnalysis = ImageAnalysis.Builder()
             .setTargetRotation(binding.previewView.display.rotation)
             .build()
-
-        val cameraExecutor = Executors.newSingleThreadExecutor()
 
         imageAnalysis.setAnalyzer(cameraExecutor){ imageProxy ->
             processImageProxy(barcodeScanner,imageProxy)

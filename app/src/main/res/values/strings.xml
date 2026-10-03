@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Human Detection</string>
+    <string name="switch_camera">Switch camera</string>
 </resources>
